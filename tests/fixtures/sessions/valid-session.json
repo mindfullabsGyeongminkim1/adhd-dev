@@ -1,0 +1,7 @@
+{
+  "pid": 12345,
+  "sessionId": "test-session-id-001",
+  "cwd": "/test/project",
+  "startedAt": 1710000000000,
+  "kind": "interactive"
+}

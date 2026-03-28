@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Crawfish Park</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;width:100%}
+body{background:#14161e;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;user-select:none}
+
+/* ========== PANEL ========== */
+#panel{
+  width:100%;height:100%;
+  display:flex;flex-direction:column;
+  border-radius:14px;
+  overflow:hidden;
+  background:#14161e;
+}
+
+/* header */
+#head{
+  height:42px;min-height:42px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:0 16px;position:relative;
+  background:#0d0f15;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+#head .title{color:rgba(255,255,255,.9);font-size:13px;font-weight:700;letter-spacing:.6px}
+#head .sub{color:rgba(255,255,255,.4);font-size:10px;margin-left:6px}
+.hbtn{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:12px;height:12px;border:none;border-radius:50%;
+  cursor:pointer;-webkit-app-region:no-drag;transition:all .15s;
+}
+.hbtn.close{left:14px;background:#ff5f57}
+.hbtn.close:hover{background:#ff3b30}
+.hbtn.minimize{left:34px;background:#febc2e}
+.hbtn.minimize:hover{background:#f5a623}
+
+/* scene */
+#scene{
+  flex:1;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#0f1729 0%,#142240 26%,#1a3a1a 50%,#2d5a27 66%,#3a7d32 80%,#4a9e3f 100%);
+}
+
+/* sky */
+#scene::before{
+  content:'';position:absolute;inset:0;height:46%;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(1px 1px at 12% 14%,rgba(255,255,255,.55),transparent),
+    radial-gradient(1.2px 1.2px at 42% 18%,rgba(255,255,255,.65),transparent),
+    radial-gradient(1px 1px at 65% 10%,rgba(255,255,255,.45),transparent),
+    radial-gradient(1px 1px at 88% 22%,rgba(255,255,255,.5),transparent),
+    radial-gradient(1.3px 1.3px at 28% 28%,rgba(255,255,255,.6),transparent),
+    radial-gradient(1px 1px at 78% 6%,rgba(255,255,255,.4),transparent);
+}
+
+.moon{
+  position:absolute;top:6%;right:12%;width:28px;height:28px;border-radius:50%;z-index:1;
+  background:radial-gradient(circle at 35% 35%,#FFF9C4,#FFE082);
+  box-shadow:0 0 16px rgba(255,249,196,.3),0 0 36px rgba(255,249,196,.12);
+}
+
+.tree{position:absolute;z-index:3;display:flex;flex-direction:column;align-items:center}
+.tcr{width:34px;height:42px;background:radial-gradient(ellipse at 50% 60%,#2e7d32,#1b5e20);border-radius:50% 50% 42% 42%;position:relative}
+.tcr::before{content:'';position:absolute;top:-11px;left:6px;width:20px;height:28px;background:radial-gradient(ellipse at 50% 55%,#388e3c,#2e7d32);border-radius:50% 50% 38% 38%}
+.ttr{width:6px;height:14px;background:linear-gradient(90deg,#5d4037,#795548,#5d4037);border-radius:0 0 2px 2px;margin-top:-3px}
+
+.pond{
+  position:absolute;bottom:12%;right:8%;width:72px;height:34px;border-radius:50%;z-index:2;
+  background:radial-gradient(ellipse,#2196F3,#1565C0 55%,#0D47A1);
+  opacity:.6;box-shadow:0 0 10px rgba(33,150,243,.2);animation:shimmer 4s ease-in-out infinite;
+}
+
+.ground{position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(180deg,#2d5a27,#3a7d32 40%,#4a9e3f);z-index:1}
+
+.grass{position:absolute;left:0;right:0;height:10px;display:flex;justify-content:space-around;z-index:2;pointer-events:none}
+.grass i{display:block;width:3px;height:8px;background:#5cb85c;border-radius:50% 50% 0 0;transform-origin:bottom;animation:sway 3s ease-in-out infinite}
+.grass i:nth-child(odd){height:10px;background:#6ece6e;animation-delay:-1.2s}
+.grass i:nth-child(3n){height:6px;background:#4caf50;animation-duration:2.4s}
+
+/* ========== CRAWFISH ========== */
+.craw{
+  position:absolute;z-index:5;display:flex;flex-direction:column;align-items:center;
+  transition:left .8s ease,bottom .8s ease;
+}
+.craw img{width:50px;height:50px;object-fit:contain;image-rendering:pixelated}
+.craw .nm{font-size:9.5px;font-weight:600;color:rgba(255,255,255,.88);text-shadow:0 1px 3px rgba(0,0,0,.7);max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.craw .lv{font-size:8.5px;font-weight:500;text-shadow:0 1px 2px rgba(0,0,0,.5);margin-top:1px}
+.craw .tk{font-size:7.5px;color:rgba(255,255,255,.45)}
+
+.craw[data-s="working"] img{animation:bounce .8s ease-in-out infinite}
+.craw[data-s="idle"] img{animation:sway 3s ease-in-out infinite}
+.craw[data-s="sleeping"] img{animation:breathe 4s ease-in-out infinite}
+.craw[data-s="sleeping"]::after{content:'z Z';position:absolute;top:-8px;right:-2px;font-size:9px;color:rgba(255,255,255,.35);animation:zzz 3s ease-in-out infinite}
+
+.craw[data-l="1"] img{filter:drop-shadow(0 0 3px rgba(136,136,136,.4))}
+.craw[data-l="2"] img{filter:drop-shadow(0 0 5px rgba(0,188,212,.5))}
+.craw[data-l="3"] img{filter:drop-shadow(0 0 7px rgba(76,175,80,.5))}
+.craw[data-l="4"] img{filter:drop-shadow(0 0 9px rgba(255,193,7,.6))}
+.craw[data-l="5"] img{filter:drop-shadow(0 0 12px rgba(255,23,68,.7))}
+
+.c1{color:#aaa}.c2{color:#26c6da}.c3{color:#66bb6a}.c4{color:#ffc107}.c5{color:#ff1744}
+
+/* stat bar */
+#stats{
+  position:absolute;bottom:8px;left:10px;right:10px;z-index:10;
+  display:flex;justify-content:space-between;padding:5px 10px;
+  background:rgba(0,0,0,.5);border-radius:8px;
+}
+#stats span{font-size:9.5px;color:rgba(255,255,255,.55)}
+#stats b{color:rgba(255,255,255,.85)}
+
+/* empty */
+#empty{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:5;color:rgba(255,255,255,.5);display:none}
+#empty .e{font-size:34px;margin-bottom:6px}
+#empty .m{font-size:11px;line-height:1.5}
+
+/* ========== Arrow pointer at top ========== */
+#arrow{
+  position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  width:16px;height:8px;z-index:20;
+}
+#arrow::before{
+  content:'';display:block;width:0;height:0;
+  border-left:8px solid transparent;border-right:8px solid transparent;
+  border-bottom:8px solid rgba(20,22,30,0.96);
+}
+
+@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes bounce{0%,100%{transform:translateY(0) scale(1)}25%{transform:translateY(-7px) scale(1.03) rotate(-3deg)}75%{transform:translateY(-3px) rotate(2deg)}}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.04);opacity:.88}}
+@keyframes zzz{0%,100%{transform:translateY(0);opacity:.25}50%{transform:translateY(-7px);opacity:.6}}
+@keyframes shimmer{0%,100%{opacity:.6}50%{opacity:.75}}
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <div id="head">
+    <button class="hbtn close" id="btn-quit" title="Quit"></button>
+    <button class="hbtn minimize" id="btn-hide" title="Hide"></button>
+    <span class="title">🦞 Crawfish Park</span>
+    <span class="sub" id="head-sub"></span>
+  </div>
+  <div id="scene">
+    <div class="moon"></div>
+    <div class="tree" style="left:4%;bottom:38%"><div class="tcr"></div><div class="ttr"></div></div>
+    <div class="tree" style="right:4%;bottom:42%"><div class="tcr"></div><div class="ttr"></div></div>
+    <div class="tree" style="left:26%;bottom:48%;transform:scale(.6)"><div class="tcr"></div><div class="ttr"></div></div>
+    <div class="ground"></div>
+    <div class="pond"></div>
+    <div class="grass" style="bottom:49%"></div>
+    <div class="grass" style="bottom:36%"></div>
+    <div class="grass" style="bottom:22%"></div>
+    <div id="area"></div>
+    <div id="empty"><div class="e">🦞</div><div class="m">Claude Code 세션을 시작하면<br>가재가 나타납니다</div></div>
+    <div id="stats">
+      <span>Sessions <b id="sn">0</b></span>
+      <span>Active <b id="sa">0</b></span>
+      <span>Tokens <b id="st">0</b></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const LVL=['','baby','juvenile','adult','warrior','king'];
+const LNAME=['','Baby','Juvenile','Adult','Warrior','King'];
+const POS=[
+  {left:'14%',bottom:'22%'},{left:'54%',bottom:'26%'},{left:'34%',bottom:'16%'},
+  {left:'72%',bottom:'20%'},{left:'22%',bottom:'32%'},{left:'46%',bottom:'12%'},
+  {left:'8%',bottom:'38%'},{left:'80%',bottom:'30%'},
+];
+let agents=[],sprites={};
+
+document.querySelectorAll('.grass').forEach(g=>{for(let i=0;i<26;i++){const b=document.createElement('i');b.style.animationDelay=(-Math.random()*3)+'s';g.appendChild(b)}});
+
+function fmt(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return String(n)}
+function sk(a){return(LVL[a.level]||'baby')+'_'+(a.state==='working'?'working':a.state==='idle'?'idle':'sleeping')}
+
+function render(){
+  const area=document.getElementById('area');
+  const empty=document.getElementById('empty');
+  if(!agents.length){area.innerHTML='';empty.style.display='block';return}
+  empty.style.display='none';
+
+  const sorted=[...agents].sort((a,b)=>{
+    if(a.state==='working'&&b.state!=='working')return -1;
+    if(b.state==='working'&&a.state!=='working')return 1;
+    return b.level-a.level;
+  });
+
+  const old={};
+  area.querySelectorAll('.craw').forEach(el=>{old[el.dataset.id]=el});
+  const used=new Set();
+
+  sorted.forEach((ag,i)=>{
+    used.add(ag.sessionId);
+    let el=old[ag.sessionId];
+    const p=POS[i%POS.length];
+    if(!el){
+      el=document.createElement('div');
+      el.className='craw';el.dataset.id=ag.sessionId;
+      el.innerHTML='<img alt=""><div class="nm"></div><div class="lv"></div><div class="tk"></div>';
+      area.appendChild(el);
+    }
+    el.dataset.s=ag.state;el.dataset.l=ag.level;
+    el.style.left=p.left;el.style.bottom=p.bottom;
+    const k=sk(ag),img=el.querySelector('img');
+    if(sprites[k]&&img.src!==sprites[k])img.src=sprites[k];
+    el.querySelector('.nm').textContent=ag.projectName;
+    const lv=el.querySelector('.lv');
+    lv.textContent='Lv'+ag.level+' '+LNAME[ag.level];lv.className='lv c'+ag.level;
+    el.querySelector('.tk').textContent=fmt(ag.tokenUsage);
+  });
+  Object.keys(old).forEach(id=>{if(!used.has(id))old[id].remove()});
+
+  const act=agents.filter(a=>a.state==='working').length;
+  const tok=agents.reduce((s,a)=>s+(a.rawTokenUsage||a.tokenUsage||0),0);
+  document.getElementById('sn').textContent=agents.length;
+  document.getElementById('sa').textContent=act;
+  document.getElementById('st').textContent=fmt(tok);
+  document.getElementById('head-sub').textContent=agents.length+' agents · '+act+' active';
+}
+
+document.getElementById('btn-quit').addEventListener('click',()=>window.api.quit());
+document.getElementById('btn-hide').addEventListener('click',()=>window.api.hide());
+document.addEventListener('keydown',e=>{if(e.key==='Escape')window.api.hide()});
+
+window.api.onUpdate(d=>{
+  agents=d.agents||[];
+  if(d.sprites)Object.assign(sprites,d.sprites);
+  render();
+});
+</script>
+</body>
+</html>

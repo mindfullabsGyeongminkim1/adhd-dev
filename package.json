@@ -1,0 +1,43 @@
+{
+  "name": "adhd-dev",
+  "version": "0.1.0",
+  "description": "CLI-integrated focus tool for ADHD developers using multiple Claude Code sessions",
+  "type": "module",
+  "bin": {
+    "adhd-dev": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "src/hooks"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsup && rm -rf dist/notch/renderer && cp -r src/notch/renderer dist/notch/renderer",
+    "build:notch": "tsup && rm -rf dist/notch/renderer && cp -r src/notch/renderer dist/notch/renderer",
+    "dev": "tsx src/cli/index.ts",
+    "dev:daemon": "tsx src/daemon/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "generate:sprites": "python3 scripts/generate-sprites.py"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "chokidar": "^4.0.0",
+    "commander": "^13.0.0",
+    "electron": "^41.1.0",
+    "node-notifier": "^10.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-notifier": "^8.0.5",
+    "@vitest/coverage-v8": "^2.1.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "pid": 99999,
+  "sessionId": "non-interactive-session",
+  "cwd": "/some/path",
+  "startedAt": 1710000000000,
+  "kind": "headless"
+}
