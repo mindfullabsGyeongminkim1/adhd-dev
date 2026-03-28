@@ -1,11 +1,11 @@
-# ADHD-Dev: CLI-Integrated Focus Tool - 구현 명세서 v3
+# ADHD-Dev: CLI-Integrated Focus Tool - 구현 명세서 v4
 
 > ADHD 성향의 개발자가 멀티 CLI/AI 코딩 환경에서 집중력을 유지하도록 돕는 CLI 통합 도구
 > **현재 완성본 기준 재현 가능한 상세 구현 명세서**
 
-> **Version**: v3 (2026-03-27) - 실제 구현 기반 역설계
+> **Version**: v4 (2026-03-28) - Notch Widget (Electron 메뉴바 위젯) 추가
 > **Original**: Plan B CLI-Integrated Focus Tool (2026-03-24)
-> **변경점**: ink → raw ANSI TUI, sql.js → JSON 파일 기반, 가재 게이미피케이션 + 픽셀 애니메이션 추가, 토큰 Decay 시스템, CJK 문자 폭 처리, 자연어 활동 표시
+> **변경점**: ink → raw ANSI TUI, sql.js → JSON 파일 기반, 가재 게이미피케이션 + 픽셀 애니메이션 추가, 토큰 Decay 시스템, CJK 문자 폭 처리, 자연어 활동 표시, **Electron Notch Widget (Crawfish Park)**
 
 ---
 
@@ -18,15 +18,17 @@
 3. **Non-Judgmental by Default**: 심리학적 원칙 계승. 감시가 아닌 자기인식 도구
 4. **Progressive Enhancement**: 단순 CLI 명령어부터 시작하여 daemon, TUI, prompt 통합으로 점진 확장
 5. **Gamification over Guilt**: 가재 진화 시스템으로 작업을 게임화. 처벌이 아닌 성장 동기 부여
+6. **Ambient Presence**: macOS 메뉴바에 상주하는 Notch Widget으로 터미널 밖에서도 세션 상태 파악
 
-### 선택된 아키텍처: Daemon + CLI + Raw ANSI TUI + Hooks
+### 선택된 아키텍처: Daemon + CLI + Raw ANSI TUI + Hooks + Notch Widget (Electron)
 
-**근거**: Dopamine Architecture의 5개 메커니즘 모두 구현 가능한 유일한 옵션. daemon이 AdaptiveEngine과 SignalEmitter를 호스팅하고, shell prompt/tmux가 passive visibility를 담당.
+**근거**: Dopamine Architecture의 5개 메커니즘 모두 구현 가능한 유일한 옵션. daemon이 AdaptiveEngine과 SignalEmitter를 호스팅하고, shell prompt/tmux가 passive visibility를 담당. Notch Widget이 터미널 밖 ambient presence를 담당.
 
 **변경된 기술 선택**:
 - ~~ink (React for CLI)~~ → **raw ANSI escape sequences + chalk**: 의존성 최소화, halfblock 픽셀 아트와 직접 호환
 - ~~sql.js (WASM SQLite)~~ → **JSON 파일 기반**: 설치 복잡성 제거, 데이터량이 극소하므로 SQL 불필요
 - **추가**: 가재 진화 게이미피케이션, 픽셀 애니메이션, 토큰 Decay
+- **추가**: Electron 기반 macOS Notch Widget (Crawfish Park) — 메뉴바 트레이 아이콘 + 풍경 패널
 
 ---
 
@@ -50,6 +52,7 @@
 6. **세션 대시보드 (Raw ANSI TUI)** - 동적 그리드 레이아웃에서 전체 세션 상태 한눈에 파악
 7. **Passive Visibility** - Shell prompt + tmux status-bar 통합
 8. **Dopamine Architecture (CLI 적응)** - 5개 도파민 메커니즘의 터미널 환경 적응
+9. **Notch Widget (Crawfish Park)** - macOS 메뉴바 Electron 위젯. 픽셀 스프라이트 가재들이 풍경 속에서 뛰어놀며 실시간 세션 상태 표시
 
 ---
 
@@ -90,6 +93,7 @@
 | **Terminal Bell** | `\a` (BEL). 타이머 완료, 과집중 알림 | Active (1회성) | Completion Ripple, Rhythm Anchor |
 | **System Notification** | `node-notifier` 기반 OS 알림 | Active (1회성) | Completion Ripple, Rhythm Anchor |
 | **TUI Dashboard** | `adhd dash` 실시간 대시보드 | On-demand | 모든 메커니즘 + 가재 시각화 |
+| **Notch Widget** | macOS 메뉴바 트레이 + Crawfish Park 패널 | Passive (ambient) | Context Warmth, 가재 시각화, 세션 카운트 |
 
 ### 메커니즘 1: Momentum Pulse (모멘텀 펄스)
 
@@ -339,6 +343,7 @@ IF 연속_세션 >= 3
 | Test | `vitest` ^2 | 빠른 실행, ESM 네이티브 |
 | File Watch | `chokidar` ^4 | FSEvents/inotify 크로스 플랫폼 래퍼 |
 | Notification | `node-notifier` ^10 | macOS/Linux 크로스 플랫폼 |
+| Notch Widget | `electron` (optional) | macOS 메뉴바 트레이 위젯. Crawfish Park 시각화 |
 | Data Storage | JSON 파일 기반 | sql.js WASM 대비 설치 복잡성 제거. 데이터량 극소 |
 | Hook Scripts | Shell (bash) | Node.js cold-start (~300ms) 회피 → ~5ms |
 | Sprite Gen | Python + PIL/numpy | PNG 스프라이트 분할 및 ANSI 아트 변환 |
@@ -346,58 +351,58 @@ IF 연속_세션 >= 3
 ### 아키텍처 다이어그램
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                      User Interfaces                              │
-│                                                                   │
-│  ┌──────────────┐ ┌──────────────┐ ┌───────────┐ ┌─────────────┐ │
-│  │  CLI Client   │ │ TUI Dashboard│ │ Shell     │ │ Claude Code │ │
-│  │  (adhd ...)   │ │ (adhd dash)  │ │ Prompt    │ │ Hooks       │ │
-│  │               │ │              │ │ Integration│ │ (shell      │ │
-│  │  16 commands  │ │ Raw ANSI +   │ │           │ │  scripts)   │ │
-│  │  commander.js │ │ chalk +      │ │ PS1/RPROMPT│ │             │ │
-│  │               │ │ halfblock art│ │ tmux bar  │ │ → socket    │ │
-│  │  status       │ │              │ │ term title│ │   message   │ │
-│  │  where        │ │ Crawfish Art │ │           │ │             │ │
-│  │  timer        │ │ Pixel Anim   │ │           │ │             │ │
-│  │  dash         │ │ Token Viz    │ │           │ │             │ │
-│  │  go           │ │ Activity NLP │ │           │ │             │ │
-│  └──────┬───────┘ └──────┬───────┘ └─────┬─────┘ └──────┬──────┘ │
-│         │                │               │               │        │
-│  ┌──────┴────────────────┴───────────────┴───────────────┴─────┐  │
-│  │              IPC Layer (Unix Socket)                         │  │
-│  │         ~/.adhd-dev/adhd-dev.sock                           │  │
-│  └──────────────────────┬──────────────────────────────────────┘  │
-│                          │                                        │
-│  ┌───────────────────────┴──────────────────────────────────────┐ │
-│  │                     Daemon Process                            │ │
-│  │  Tick: 10초 간격                                               │ │
-│  │                                                               │ │
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐  │ │
-│  │  │ Agent        │ │ Timer        │ │ DopamineService      │  │ │
-│  │  │ Tracker      │ │ Engine       │ │                      │  │ │
-│  │  │              │ │              │ │ AdaptiveEngine       │  │ │
-│  │  │ - discover   │ │ - flexible   │ │ SignalEmitter        │  │ │
-│  │  │   (PID→      │ │   intervals  │ │ (prompt, bell,      │  │ │
-│  │  │   sessionId  │ │ - presets    │ │  tmux, notification) │  │ │
-│  │  │   → .jsonl)  │ │ - flow      │ │                      │  │ │
-│  │  │ - token count│ │   protect    │ │ Ethical boundaries   │  │ │
-│  │  │ - decay calc │ │ - hyperfocus │ │ (hardcoded)          │  │ │
-│  │  │ - leveling   │ │   detect     │ │                      │  │ │
-│  │  └──────┬───────┘ └──────────────┘ └──────────┬───────────┘  │ │
-│  │         │                                     │               │ │
-│  │  ┌──────┴─────────────────────────────────────┴────────────┐  │ │
-│  │  │  JSON Files + File Watchers + Prompt State              │  │ │
-│  │  │  ~/.adhd-dev/config.json       (사용자 설정)             │  │ │
-│  │  │  ~/.adhd-dev/timer-state.json  (타이머 상태)             │  │ │
-│  │  │  ~/.adhd-dev/prompt-state.json (shell prompt용 상태)     │  │ │
-│  │  │  ~/.adhd-dev/baseline.json     (AdaptiveEngine 기준선)   │  │ │
-│  │  │  ~/.adhd-dev/events.jsonl      (이벤트 로그)             │  │ │
-│  │  │  ~/.adhd-dev/stats/YYYY-MM-DD.json (일일 통계)           │  │ │
-│  │  │  ~/.adhd-dev/logs/             (에러/디버그 로그)         │  │ │
-│  │  └──────────────────────┬─────────────────────────────────┘  │ │
-│  └──────────────────────────┼────────────────────────────────────┘ │
-│                             │                                     │
-└─────────────────────────────┼─────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         User Interfaces                                  │
+│                                                                          │
+│ ┌─────────────┐┌─────────────┐┌──────────┐┌───────────┐┌──────────────┐ │
+│ │ CLI Client   ││ TUI Dash    ││ Shell    ││ Claude    ││ Notch Widget │ │
+│ │ (adhd ...)   ││ (adhd dash) ││ Prompt   ││ Code Hooks││ (Electron)   │ │
+│ │              ││             ││ Integr.  ││ (shell    ││              │ │
+│ │ 18 commands  ││ Raw ANSI +  ││          ││ scripts)  ││ Crawfish Park│ │
+│ │ commander.js ││ chalk +     ││PS1/RPRMT ││           ││ Tray + Panel │ │
+│ │              ││ halfblock   ││tmux bar  ││ → socket  ││ 480×520px    │ │
+│ │ status,where ││ Crawfish Art││term title││   message ││ 풍경+가재 PNG│ │
+│ │ timer,dash   ││ Pixel Anim  ││          ││           ││ 2s 폴링      │ │
+│ │ notch,go     ││ Token Viz   ││          ││           ││ 실시간 상태  │ │
+│ └──────┬───────┘└──────┬──────┘└────┬─────┘└─────┬─────┘└──────┬───────┘ │
+│        │               │            │            │             │          │
+│ ┌──────┴───────────────┴────────────┴────────────┴─────────────┴───────┐ │
+│ │                IPC Layer (Unix Socket)                                │ │
+│ │           ~/.adhd-dev/adhd-dev.sock                                  │ │
+│ │  Notch: discoverAgents() 직접 호출 (IPC 미사용, 동일 프로세스 내)      │ │
+│ └──────────────────────────┬───────────────────────────────────────────┘ │
+│                             │                                            │
+│ ┌───────────────────────────┴──────────────────────────────────────────┐ │
+│ │                       Daemon Process                                 │ │
+│ │  Tick: 10초 간격                                                      │ │
+│ │                                                                      │ │
+│ │  ┌──────────────┐ ┌──────────────┐ ┌────────────────────────────┐   │ │
+│ │  │ Agent        │ │ Timer        │ │ DopamineService            │   │ │
+│ │  │ Tracker      │ │ Engine       │ │                            │   │ │
+│ │  │              │ │              │ │ AdaptiveEngine             │   │ │
+│ │  │ - discover   │ │ - flexible   │ │ SignalEmitter              │   │ │
+│ │  │   (PID→      │ │   intervals  │ │ (prompt, bell,            │   │ │
+│ │  │   sessionId  │ │ - presets    │ │  tmux, notification)      │   │ │
+│ │  │   → .jsonl)  │ │ - flow      │ │                            │   │ │
+│ │  │ - token count│ │   protect    │ │ Ethical boundaries         │   │ │
+│ │  │ - decay calc │ │ - hyperfocus │ │ (hardcoded)                │   │ │
+│ │  │ - leveling   │ │   detect     │ │                            │   │ │
+│ │  └──────┬───────┘ └──────────────┘ └──────────┬─────────────────┘   │ │
+│ │         │                                     │                     │ │
+│ │  ┌──────┴─────────────────────────────────────┴──────────────────┐  │ │
+│ │  │  JSON Files + File Watchers + Prompt State                    │  │ │
+│ │  │  ~/.adhd-dev/config.json       (사용자 설정)                   │  │ │
+│ │  │  ~/.adhd-dev/timer-state.json  (타이머 상태)                   │  │ │
+│ │  │  ~/.adhd-dev/prompt-state.json (shell prompt용 상태)           │  │ │
+│ │  │  ~/.adhd-dev/baseline.json     (AdaptiveEngine 기준선)         │  │ │
+│ │  │  ~/.adhd-dev/events.jsonl      (이벤트 로그)                   │  │ │
+│ │  │  ~/.adhd-dev/stats/YYYY-MM-DD.json (일일 통계)                 │  │ │
+│ │  │  ~/.adhd-dev/notch.pid         (Notch Widget PID 파일)         │  │ │
+│ │  │  ~/.adhd-dev/logs/             (에러/디버그 로그)               │  │ │
+│ │  └──────────────────────┬────────────────────────────────────────┘  │ │
+│ └──────────────────────────┼─────────────────────────────────────────┘ │
+│                             │                                          │
+└─────────────────────────────┼──────────────────────────────────────────┘
                               │
                     ┌─────────┴──────────────┐
                     │ ~/.claude/              │
@@ -872,7 +877,7 @@ setInterval(() => void refresh(), 2000);
 
 ---
 
-## 8. CLI 명령어 (16개)
+## 8. CLI 명령어 (18개)
 
 ### 8.1 명령어 목록
 
@@ -882,8 +887,9 @@ adhd-dev status              # 활성/유휴 세션 수 + 목록
 adhd-dev where [--brief]     # "어디까지 했더라?" 컨텍스트
 adhd-dev today               # 오늘의 집중 통계
 
-# 대시보드
+# 대시보드 & 위젯
 adhd-dev dash                # TUI 대시보드 (인터랙티브)
+adhd-dev notch [start|stop|status]  # macOS 메뉴바 Crawfish Park 위젯
 
 # 타이머
 adhd-dev timer start [min]   # 집중 타이머 시작 (기본 25분)
@@ -896,6 +902,10 @@ adhd-dev go <session>        # 세션 디렉토리로 이동 (shell eval)
 
 # 모드
 adhd-dev flow <on|off>       # 방해금지 모드
+
+# Shell 통합
+adhd-dev prompt-status       # PS1/RPROMPT용 상태 문자열 출력
+adhd-dev tmux-status         # tmux status-right용 컬러 문자열 출력
 
 # 설치/관리
 adhd-dev init [--full]       # 설치 위자드
@@ -1072,9 +1082,264 @@ set -g status-interval 5
 
 ---
 
-## 12. 데이터 저장소
+## 12. Notch Widget (Crawfish Park) — Electron 메뉴바 위젯
 
-### 12.1 파일 경로 (`core/paths.ts`)
+### 12.1 개요
+
+터미널 밖에서도 세션 상태를 인지할 수 있는 **macOS 메뉴바 위젯**. 가재들이 풍경(밤하늘 + 잔디 + 연못) 속에서 뛰어노는 "Crawfish Park" 컨셉. Electron으로 구현되며, `adhd-dev notch` 명령어로 독립 프로세스 실행.
+
+**설계 원칙**: Terminal-Native 원칙을 깨지 않으면서도, 터미널을 떠났을 때 ambient presence를 제공. 정보 확인을 위해 터미널로 돌아갈 필요 없이 메뉴바 클릭 한 번으로 상태 파악.
+
+### 12.2 아키텍처
+
+```
+┌───────────────────────────────────────────────────────┐
+│                    Electron Main Process               │
+│                                                       │
+│  ┌──────────┐  ┌───────────────┐  ┌────────────────┐  │
+│  │   Tray    │  │ BrowserWindow │  │ discoverAgents │  │
+│  │  (18×18)  │  │  (480×520px)  │  │  () 직접 호출  │  │
+│  │           │  │               │  │                │  │
+│  │ 최고레벨  │  │  Crawfish Park│  │ ~/.claude/     │  │
+│  │ 가재 아이콘│  │  렌더러       │  │  sessions/     │  │
+│  │           │  │               │  │  projects/     │  │
+│  │ left-click│  │ contextBridge │  │                │  │
+│  │ → toggle  │  │ + preload.cjs │  │ 2초 폴링       │  │
+│  │           │  │               │  │                │  │
+│  │ right-click│ │ IPC channels: │  │ → agents[]     │  │
+│  │ → context │  │  'update'     │  │ → tray icon    │  │
+│  │   menu    │  │  'quit'       │  │ → tooltip      │  │
+│  │           │  │  'hide'       │  │                │  │
+│  └────┬──────┘  └───────┬───────┘  └───────┬────────┘  │
+│       │                 │                   │           │
+│       └─────────────────┴───────────────────┘           │
+│                                                         │
+│  Single Instance Lock: app.requestSingleInstanceLock()  │
+│  PID File: ~/.adhd-dev/notch.pid                        │
+│  app.dock.hide() — Dock에 표시 안 됨                     │
+│  visibleOnAllWorkspaces — 모든 데스크톱에서 표시          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 12.3 Tray 아이콘
+
+- **크기**: 18×18px 리사이즈
+- **아이콘 선택**: 전체 에이전트 중 최고 레벨 가재의 스프라이트
+- **상태 반영**: working → `{level}_working.png`, 그 외 → `{level}_idle.png`
+- **에이전트 없을 때**: `baby_idle.png` 기본값
+- **툴팁**: `ADHD-Dev — {N} sessions, {M} active`
+
+```typescript
+function makeTrayIcon(agents: AgentInfo[]): NativeImage {
+  const best = agents.length
+    ? agents.reduce((a, b) => b.level > a.level ? b : a, agents[0])
+    : null;
+  const lvl = best ? ['','baby','juvenile','adult','warrior','king'][best.level] : 'baby';
+  const st = best?.state === 'working' ? 'working' : 'idle';
+  const f = join(assetsDir(), `${lvl}_${st}.png`);
+  return existsSync(f)
+    ? nativeImage.createFromPath(f).resize({ width: 18, height: 18 })
+    : nativeImage.createEmpty();
+}
+```
+
+**클릭 동작**:
+- **좌클릭**: 패널 토글 (열기/닫기)
+- **우클릭**: 컨텍스트 메뉴 (`Open Crawfish Park` / `Quit ADHD-Dev`)
+- macOS에서 `setContextMenu` 사용 시 좌클릭도 가로채는 버그 → `tray.on('click')` + `tray.on('right-click')` + `popUpContextMenu()` 패턴 사용
+
+### 12.4 Crawfish Park 패널 (렌더러)
+
+**패널 설정**:
+```typescript
+panel = new BrowserWindow({
+  width: 480, height: 520,
+  show: false, frame: false, transparent: false,
+  alwaysOnTop: true, skipTaskbar: true, resizable: false,
+  hasShadow: true, fullscreenable: false,
+  backgroundColor: '#14161e',
+  roundedCorners: true,
+  webPreferences: {
+    preload: join(__dirname, 'preload.cjs'),
+    contextIsolation: true,      // 보안: renderer에서 Node.js 접근 불가
+    nodeIntegration: false,       // 보안: require() 비활성화
+  },
+});
+panel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+```
+
+**풍경 레이아웃**:
+```
+┌─────────────────────────────────────────────┐
+│  [●][●]          🦞 Crawfish Park    2 agents│  ← 헤더 (42px)
+├─────────────────────────────────────────────┤
+│  ☆    ☆              ☆                      │  ← 별이 빛나는 밤하늘
+│         ☆       🌙                          │  ← 달 (radial gradient)
+│                                              │
+│   🌲            🌲                    🌲     │  ← 나무 (CSS div)
+│  ──────────── 잔디 라인 ──────────────────── │  ← 풀밭 경계
+│                                              │
+│   🦞 project-a    🦞 project-b              │  ← 가재 스프라이트
+│                          🦞 project-c        │     (절대 위치 배치)
+│                                    🌊        │  ← 연못 (shimmer 애니메이션)
+│                                              │
+│  Sessions 3    Active 2    Tokens 68.6K      │  ← 하단 스탯 바
+└─────────────────────────────────────────────┘
+```
+
+**비주얼 요소**:
+| 요소 | CSS 구현 |
+|------|---------|
+| 밤하늘 | `#scene::before` + `radial-gradient` 별 6개 |
+| 달 | `.moon` div, `radial-gradient(#FFF9C4, #FFE082)` + glow shadow |
+| 나무 | `.tree` = `.tcr` (수관, `radial-gradient` 타원) + `.ttr` (줄기) |
+| 잔디 | `.grass` = 26개 `<i>` 블레이드, `sway` 애니메이션 (3초 주기) |
+| 연못 | `.pond`, `shimmer` 애니메이션 (opacity 0.6↔0.75, 4초 주기) |
+| 지면 | `.ground`, `linear-gradient(#2d5a27 → #4a9e3f)` |
+
+### 12.5 가재 렌더링 및 애니메이션
+
+**배치**: 최대 8개 사전 정의 위치 (순환 배치)
+```javascript
+const POS = [
+  {left:'14%',bottom:'22%'}, {left:'54%',bottom:'26%'},
+  {left:'34%',bottom:'16%'}, {left:'72%',bottom:'20%'},
+  {left:'22%',bottom:'32%'}, {left:'46%',bottom:'12%'},
+  {left:'8%',bottom:'38%'},  {left:'80%',bottom:'30%'},
+];
+```
+
+**정렬**: working 상태 우선 → 레벨 내림차순
+
+**스프라이트 로딩**:
+- `assets/crayfish/{stage}_{state}.png` 20개 파일
+- Base64 인코딩으로 renderer에 전송 (최초 1회만, 이후 에이전트 데이터만 전송)
+- `image-rendering: pixelated` 로 선명한 픽셀 아트 유지
+
+**상태별 CSS 애니메이션**:
+| 상태 | 애니메이션 | 주기 | 효과 |
+|------|-----------|------|------|
+| working | `bounce` | 0.8s | 위아래 점프 + 미세 회전 + 스케일 |
+| idle | `sway` | 3s | 좌우 4° 흔들림 |
+| sleeping | `breathe` | 4s | 스케일 ±4% + 투명도 0.7↔0.88 |
+
+**sleeping 상태 추가 효과**: `::after` 의사 요소로 `z Z` 텍스트가 위로 떠오르는 애니메이션
+
+**레벨별 glow 효과** (`drop-shadow` 필터):
+| Lv | 색상 | 반경 | 강도 |
+|----|------|------|------|
+| 1 Baby | gray (#888) | 3px | 0.4 |
+| 2 Juvenile | cyan (#00bcd4) | 5px | 0.5 |
+| 3 Adult | green (#4caf50) | 7px | 0.5 |
+| 4 Warrior | yellow (#ffc107) | 9px | 0.6 |
+| 5 King | red (#ff1744) | 12px | 0.7 |
+
+### 12.6 데이터 폴링
+
+- **주기**: 2초 (`setInterval(sendData, 2000)`)
+- **데이터 소스**: `discoverAgents()` 직접 호출 (daemon IPC 미사용, Electron 메인 프로세스 내에서 직접 세션 탐색)
+- **IPC 채널**: `panel.webContents.send('update', { agents, sprites })`
+- **최적화**: 스프라이트 데이터는 최초 1회만 전송, 이후 에이전트 배열만 전송
+- **렌더러 로드 대기**: `did-finish-load` 이벤트 + 2초 fallback setTimeout
+
+### 12.7 패널 토글 동작
+
+```typescript
+function togglePanel() {
+  if (panel.isVisible()) { panel.hide(); return; }
+
+  // 트레이 아이콘 중심에 패널 정렬
+  const tb = tray.getBounds();
+  const { workArea } = screen.getPrimaryDisplay();
+  const x = Math.max(workArea.x, Math.min(
+    Math.round(tb.x + tb.width / 2 - PANEL_W / 2),
+    workArea.x + workArea.width - PANEL_W
+  ));
+  const y = tb.y + tb.height + 4;  // 트레이 아래 4px 간격
+
+  panel.setPosition(x, y);
+  panel.show();
+  panel.focus();
+  lastShowAt = Date.now();  // blur debounce용 타임스탬프
+}
+```
+
+**blur 디바운스**: `panel.on('blur')` 시 `Date.now() - lastShowAt > 500`ms 일 때만 hide. 패널이 표시된 직후 blur 이벤트로 즉시 숨겨지는 macOS 버그 방지.
+
+### 12.8 Preload 스크립트 (보안)
+
+```typescript
+// preload.ts → preload.cjs (CommonJS 필수, Electron sandbox 요구사항)
+import { contextBridge, ipcRenderer } from 'electron';
+
+contextBridge.exposeInMainWorld('api', {
+  onUpdate: (cb) => ipcRenderer.on('update', (_e, d) => cb(d)),
+  quit: () => ipcRenderer.send('quit'),
+  hide: () => ipcRenderer.send('hide'),
+});
+```
+
+- `contextIsolation: true` → renderer 코드가 Node.js API에 직접 접근 불가
+- `contextBridge`를 통해 `window.api` 객체로 안전한 IPC만 노출
+- 노출 API: `onUpdate(cb)`, `quit()`, `hide()` 3개만
+
+### 12.9 프로세스 관리
+
+**CLI 명령어** (`notch.ts`):
+| 서브커맨드 | 동작 |
+|-----------|------|
+| `notch` 또는 `notch start` | Electron 프로세스를 detached로 spawn, 0.5초 후 CLI 종료 |
+| `notch stop` | PID 파일에서 PID 읽어서 `SIGTERM` 전송 |
+| `notch status` | PID 파일 확인 + `process.kill(pid, 0)` 으로 프로세스 생존 확인 |
+
+**생명주기**:
+- `app.requestSingleInstanceLock()` → 중복 실행 방지, 이미 실행 중이면 기존 패널 토글
+- `app.dock.hide()` → macOS Dock에 아이콘 미표시
+- PID 파일: `~/.adhd-dev/notch.pid` (시작 시 생성, 종료 시 삭제)
+- SIGTERM/SIGINT → graceful shutdown (interval 정리, PID 삭제, tray/panel destroy)
+
+### 12.10 빌드 설정
+
+```typescript
+// tsup.config.ts — Notch 전용 엔트리 2개
+{
+  entry: ['src/notch/main.ts'],
+  format: ['esm'],
+  target: 'node20',
+  outDir: 'dist/notch',
+  sourcemap: true,
+  external: ['electron'],     // Electron은 런타임에서 제공
+},
+{
+  // Preload는 반드시 CommonJS — Electron sandbox 요구사항
+  entry: ['src/notch/preload.ts'],
+  format: ['cjs'],
+  target: 'node20',
+  outDir: 'dist/notch',
+  sourcemap: true,
+  external: ['electron'],
+},
+```
+
+### 12.11 빈 상태 UX
+
+에이전트가 없을 때:
+```
+┌─────────────────────────┐
+│                          │
+│          🦞              │
+│                          │
+│  Claude Code 세션을 시작하면 │
+│  가재가 나타납니다          │
+│                          │
+└─────────────────────────┘
+```
+
+---
+
+## 13. 데이터 저장소
+
+### 13.1 파일 경로 (`core/paths.ts`)
 
 ```typescript
 const ADHD_DEV_HOME = '~/.adhd-dev';
@@ -1089,6 +1354,9 @@ ADHD_DEV_PATH_CACHE   = ~/.adhd-dev/path-encoding-cache.json
 // 데몬
 ADHD_DEV_PID_FILE     = ~/.adhd-dev/adhd-dev.pid
 ADHD_DEV_SOCKET       = ~/.adhd-dev/adhd-dev.sock
+
+// Notch Widget
+NOTCH_PID_FILE        = ~/.adhd-dev/notch.pid
 
 // 적응형 엔진
 BASELINE_FILE         = ~/.adhd-dev/baseline.json
@@ -1106,7 +1374,7 @@ CLAUDE_PROJECTS_DIR   = ~/.claude/projects/
 CLAUDE_SETTINGS       = ~/.claude/settings.json
 ```
 
-### 12.2 파일 스키마
+### 13.2 파일 스키마
 
 **config.json**:
 ```json
@@ -1189,12 +1457,12 @@ CLAUDE_SETTINGS       = ~/.claude/settings.json
 
 ---
 
-## 13. 빌드 & 배포
+## 14. 빌드 & 배포
 
-### 13.1 tsup 설정
+### 14.1 tsup 설정
 
 ```typescript
-// tsup.config.ts
+// tsup.config.ts — 4개 엔트리 포인트
 import { defineConfig } from 'tsup';
 
 export default defineConfig([
@@ -1205,7 +1473,6 @@ export default defineConfig([
     outDir: 'dist/cli',
     sourcemap: true,
     clean: true,
-    banner: { js: '#!/usr/bin/env node' },
   },
   {
     entry: ['src/daemon/index.ts'],
@@ -1214,10 +1481,27 @@ export default defineConfig([
     outDir: 'dist/daemon',
     sourcemap: true,
   },
+  {
+    entry: ['src/notch/main.ts'],
+    format: ['esm'],
+    target: 'node20',
+    outDir: 'dist/notch',
+    sourcemap: true,
+    external: ['electron'],     // Electron은 런타임에서 제공
+  },
+  {
+    // Preload는 반드시 CommonJS — Electron sandbox 요구사항
+    entry: ['src/notch/preload.ts'],
+    format: ['cjs'],
+    target: 'node20',
+    outDir: 'dist/notch',
+    sourcemap: true,
+    external: ['electron'],
+  },
 ]);
 ```
 
-### 13.2 package.json
+### 14.2 package.json
 
 ```json
 {
@@ -1225,13 +1509,16 @@ export default defineConfig([
   "version": "0.1.0",
   "type": "module",
   "bin": { "adhd-dev": "dist/cli/index.js" },
-  "files": ["dist", "src/hooks"],
+  "files": ["dist", "src/hooks", "assets"],
   "engines": { "node": ">=20.0.0" },
   "dependencies": {
     "chalk": "^5.3.0",
     "chokidar": "^4.0.0",
     "commander": "^13.0.0",
     "node-notifier": "^10.0.1"
+  },
+  "optionalDependencies": {
+    "electron": ">=28.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -1246,7 +1533,7 @@ export default defineConfig([
 
 ---
 
-## 14. 구현 순서 (Phase별)
+## 15. 구현 순서 (Phase별)
 
 ### Phase 1: 기반 scaffolding (Day 1)
 1. package.json, tsconfig.json, tsup.config.ts 생성
@@ -1295,9 +1582,21 @@ export default defineConfig([
 34. `services/data-purger.ts`: 30일 정리
 35. CLI 명령어: daemon
 
-### Phase 7: 통합 & 마무리 (Day 8)
+### Phase 7: 통합 (Day 8)
 36. `services/hook-installer.ts`: settings.json 수정 + 3단 백업
 37. `services/shell-integrator.ts`: zsh/bash prompt + wrapper
 38. CLI 명령어: init, doctor, config, go, install-hooks, uninstall-hooks, reset
 39. prompt-status, tmux-status 명령어
-40. 전체 빌드 검증 + 타입체크 + 테스트
+
+### Phase 8: Notch Widget — Crawfish Park (Day 9)
+40. `notch/main.ts`: Electron 메인 프로세스 — Tray, BrowserWindow, 폴링 루프
+41. `notch/preload.ts`: contextBridge IPC 노출 (CommonJS 빌드)
+42. `notch/renderer/index.html`: Crawfish Park 풍경 UI — CSS 애니메이션 + 가재 스프라이트
+43. `cli/commands/notch.ts`: notch start/stop/status CLI 명령어
+44. tsup.config.ts에 notch/main (ESM) + preload (CJS) 엔트리 추가
+45. PID 관리: `~/.adhd-dev/notch.pid`, single instance lock, graceful shutdown
+
+### Phase 9: 마무리 & 검증 (Day 10)
+46. 전체 빌드 검증 + 타입체크 + 테스트
+47. 18개 CLI 명령어 통합 테스트
+48. Notch Widget 수동 QA (tray 클릭, 패널 토글, 블러 디바운스, 멀티 데스크톱)
